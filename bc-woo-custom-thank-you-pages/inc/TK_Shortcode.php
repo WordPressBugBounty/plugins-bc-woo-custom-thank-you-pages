@@ -842,14 +842,12 @@ class TK_Shortcode
     {
         $html = '';
         foreach ($order->get_items() as $item_key => $item):
-
-
             ## Access Order Items data properties (in an array of values) ##
             $item_data = $item->get_data();
 
             $product_name = $item_data['name'];
             $quantity = $item_data['quantity'];
-            $line_total = $item_data['total'];
+            $line_total = $item_data['total'] + ($item_data['total_tax'] > 0 ? $item_data['total_tax'] : 0);
 
             // Get data from The WC_product object using methods (examples)
             $product = $item->get_product(); // Get the WC_Product object
@@ -858,8 +856,8 @@ class TK_Shortcode
             } else {
                 $product_price = "";
             }
-            $template = $is_mobile ? '<tr><td>%1$s</td> <td>%2$s x %3$s</td> <td>%4$s</td> </tr>' : '<tr><td>%1$s</td> <td>%2$s</td> <td>%3$s</td> <td>%4$s</td> </tr>';
-            $html .= sprintf($template, $product_name, $quantity, wc_price($product_price), wc_price($line_total));
+            $template = $is_mobile ? '<tr><td>%1$s</td> <td>%2$s x %3$s</td> <td>%4$s</td> <td>%5$s</td> </tr>' : '<tr><td>%1$s</td> <td>%2$s</td> <td>%3$s</td> <td>%4$s</td> <td>%5$s</td>  </tr>';
+            $html .= sprintf($template, $product_name, $quantity, wc_price($product_price), wc_price($item_data['total_tax']), wc_price($line_total));
         endforeach;
 
         return $html;
@@ -902,55 +900,10 @@ class TK_Shortcode
     public static function print_order_details_mobile()
     {
         $table_head = sprintf(
-            '<thead><tr> <th>%1$s</th> <th>%2$s</th> <th>%3$s</th> </tr></thead>',
-            __('Product', 'woocommerce'),
-            __('Quantity', 'woocommerce') . ' x ' . __('Price', 'woocommerce'),
-            __('Total', 'woocommerce')
-        );
-
-
-        //get subtotal (total items, not including shipping)
-        $subtotal_line = sprintf('<tr><td colspan="2">%1$s</td> <td>%2$s</td></tr>', __('Subtotal', 'woocommerce'), self::get_order()->get_subtotal_to_display());
-        //shipping total line
-        $shipping_line = sprintf('<tr><td colspan="2">%1$s</td> <td>%2$s</td></tr>', __('Shipping', 'woocommerce'), self::get_order()->get_shipping_to_display());
-
-
-        //tax line
-
-        $taxes = self::get_order()->get_tax_totals();
-        $tax_line = '';
-        if (count($taxes) > 0) {
-            foreach ($taxes as $t) {
-                $tax_line .= sprintf(
-                    '<tr><td colspan="2">%1$s</td> <td>%2$s</td></tr>',
-                    __($t->label, 'woocommerce'),
-                    $t->formatted_amount
-                );
-            }
-        }
-
-
-        //total line
-        $total_line = sprintf('<tr><td colspan="2">%1$s</td> <td>%2$s</td></tr>', __('Total', 'woocommerce'), self::get_order()->get_formatted_order_total());
-
-        return sprintf(
-            '<table>%1$s<tbody>%2$s %3$s %4$s %5$s %6$s</tbody></table>',
-            $table_head,
-            self::get_order_lines_html(self::get_order(), true),
-            $subtotal_line,
-            $shipping_line,
-            $tax_line,
-            $total_line
-        );
-    }
-
-    public static function print_order_details_full(): string
-    {
-        $table_head = sprintf(
             '<thead><tr> <th>%1$s</th> <th>%2$s</th> <th>%3$s</th> <th>%4$s</th> </tr></thead>',
             __('Product', 'woocommerce'),
-            __('Quantity', 'woocommerce'),
-            __('Price', 'woocommerce'),
+            __('Quantity', 'woocommerce') . ' x ' . __('Price', 'woocommerce'),
+            __('Tax', 'woocommerce'),
             __('Total', 'woocommerce')
         );
 
@@ -975,9 +928,55 @@ class TK_Shortcode
             }
         }
 
-
         //total line
         $total_line = sprintf('<tr><td colspan="3">%1$s</td> <td>%2$s</td></tr>', __('Total', 'woocommerce'), self::get_order()->get_formatted_order_total());
+
+        return sprintf(
+            '<table>%1$s<tbody>%2$s %3$s %4$s %5$s %6$s</tbody></table>',
+            $table_head,
+            self::get_order_lines_html(self::get_order(), true),
+            $subtotal_line,
+            $shipping_line,
+            $tax_line,
+            $total_line
+        );
+    }
+
+    public static function print_order_details_full(): string
+    {
+        $table_head = sprintf(
+            '<thead><tr> <th>%1$s</th> <th>%2$s</th> <th>%3$s</th> <th>%4$s</th> <th>%5$s</th> </tr></thead>',
+            __('Product', 'woocommerce'),
+            __('Quantity', 'woocommerce'),
+            __('Price', 'woocommerce'),
+            __('Tax', 'woocommerce'),
+            __('Total', 'woocommerce')
+        );
+
+
+        //get subtotal (total items, not including shipping)
+        $subtotal_line = sprintf('<tr><td colspan="4">%1$s</td> <td>%2$s</td></tr>', __('Subtotal', 'woocommerce'), self::get_order()->get_subtotal_to_display());
+        //shipping total line
+        $shipping_line = sprintf('<tr><td colspan="4">%1$s</td> <td>%2$s</td></tr>', __('Shipping', 'woocommerce'), self::get_order()->get_shipping_to_display());
+
+
+        //tax line
+
+        $taxes = self::get_order()->get_tax_totals();
+        $tax_line = '';
+        if (count($taxes) > 0) {
+            foreach ($taxes as $t) {
+                $tax_line .= sprintf(
+                    '<tr><td colspan="4">%1$s</td> <td>%2$s</td></tr>',
+                    __($t->label, 'woocommerce'),
+                    $t->formatted_amount
+                );
+            }
+        }
+
+
+        //total line
+        $total_line = sprintf('<tr><td colspan="4">%1$s</td> <td>%2$s</td></tr>', __('Total', 'woocommerce'), self::get_order()->get_formatted_order_total());
 
         return sprintf(
             '<table>%1$s<tbody>%2$s %3$s %4$s %5$s %6$s</tbody></table>',
