@@ -4,14 +4,14 @@
  * Plugin Name: BC Woo Custom Thank You Pages
  * Plugin URI: https://www.binarycarpenter.com/app/bc-thank-you-page-builder-for-woocommerce/
  * Description: Helps you create custom thank you pages for products, categories
- * Version: 1.4.19
+ * Version: 1.4.20
  * Author: WooCommerce & WordPress Tutorials
  * Author URI: https://www.binarycarpenter.com
  * License: GPL2
  * Text Domain: bc-custom-thank-you
- * Tested up to: 6.6.2.
+ * Tested up to: 6.7.1.
  * WC requires at least: 3.0.0
- * WC tested up to: 9.3.3
+ * WC tested up to: 9.4.2
  */
 
 
@@ -118,7 +118,6 @@ class Initiator
 
         try {
             $body = json_decode(wp_remote_retrieve_body($response));
-            error_log("body is " . print_r($body, true));
             if (!isset($body->versionNumber)) {
                 error_log("error checking for new version for wp thank you page builder");
                 return false;
@@ -214,13 +213,32 @@ class Initiator
 
             $products = $order->get_items();
 
-            $first_product = null;
-            //get the first product in cart to get its thank you page
-            foreach ($products as $product) {
-                $first_product = $product->get_data();
+            $first_product_id = 0;
+            $first_product_variation_id = 0;
+
+            foreach ($products as $item_id => $item) {
+                // Product name
+                $product_name = $item->get_name();
+
+                // Product ID
+                if (method_exists($item, 'get_product_id')) {
+                    error_log("setting first product id to " . $item->get_product_id());
+                    $first_product_id = $item->get_product_id();
+                }
+
+                // Variation ID (if applicable)
+                if (method_exists($item, 'get_variation_id')) {
+                    error_log("setting first variation id to " . $item->get_variation_id());
+                    $first_product_variation_id = $item->get_variation_id();
+                }
+
+                //log all the info
+                error_log("first product name: " . $product_name);
+                error_log("first product id: " . $first_product_id);
+                error_log("first variation id: " . $first_product_variation_id);
+                //only get the first product
                 break;
             }
-            $first_product_id = $first_product['product_id'];
 
 
             //get the default thank you page
@@ -229,6 +247,7 @@ class Initiator
             error_log('general thank you page ' . $thank_you_page_id);
 
             $product_thank_you_pages = $option->get_array(Oname::PER_PRODUCT_THANK_YOU_PAGE);
+            $product_variation_thank_you_pages = $option->get_array(Oname::PER_PRODUCT_VARIATION_THANK_YOU_PAGE);
             $category_thank_you_pages = $option->get_array(Oname::PER_CATEGORY_THANK_YOU_PAGE);
 
             $first_product = new WC_Product($first_product_id);
@@ -236,8 +255,14 @@ class Initiator
 
             $product_cats_ids = $first_product->get_category_ids();
 
-            //if the product has a specific thank you page set for it, then take that thank you page
-            if (isset($product_thank_you_pages["$first_product_id"])) {
+            //inspect the selected product
+            error_log("product id " . $first_product_id);
+
+            if (isset($product_variation_thank_you_pages["$first_product_variation_id"])) {
+                error_log("setting thank you page id to product variation " . $product_variation_thank_you_pages["$first_product_variation_id"]);
+                $thank_you_page_id = $product_variation_thank_you_pages["$first_product_variation_id"];
+            } else if (isset($product_thank_you_pages["$first_product_id"])) {
+                error_log("setting thank you page id to product " . $product_thank_you_pages["$first_product_id"]);
                 $thank_you_page_id = $product_thank_you_pages["$first_product_id"];
             } else {
                 //in case there isn't a thank you page set for the product, we
@@ -427,7 +452,21 @@ class Initiator
 
                 $products_select = array();
 
+                $variations_select = array();
+
                 foreach ($products as $product) {
+
+                    //if the product has variable, add it to the list
+                    if ($product->is_type('variable')) {
+                        $children   = $product->get_children($args = '', $output = OBJECT);
+                        foreach ($children as $key => $value) {
+                            $product_variatons = new \WC_Product_Variation($value);
+                            if ($product_variatons->exists() && $product_variatons->variation_is_visible()) {
+                                $variations[$value] = $product_variatons->get_variation_attributes();
+                                $variations_select[$value] = $product_variatons->get_name();
+                            }
+                        }
+                    }
 
                     $products_select[$product->get_id()] = $product->get_name();
                 }
@@ -447,6 +486,13 @@ class Initiator
                     $option_form->card_section('Specify thank you page per product', array(
                         $option_form->key_select_select(Oname::PER_PRODUCT_THANK_YOU_PAGE, $products_select, $pages_select, 'Pick product', 'Pick thank you page', !Config::IS_PRO)
                     ), false);
+
+                $thank_you_tab[] =
+                    $option_form->card_section('Specify thank you page per product variation', array(
+                        $option_form->key_select_select(Oname::PER_PRODUCT_VARIATION_THANK_YOU_PAGE, $variations_select, $pages_select, 'Pick product', 'Pick thank you page', !Config::IS_PRO)
+                    ), false);
+
+
                 //activation section
                 if (!Config::IS_PRO) {
                     $thank_you_tab[] = StaticUI::notice('Auto complete order is available in the pro version only.', 'string', false, false);
