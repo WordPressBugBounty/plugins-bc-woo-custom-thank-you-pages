@@ -4,7 +4,7 @@
  * Plugin Name: BC Woo Custom Thank You Pages
  * Plugin URI: https://www.binarycarpenter.com/app/bc-thank-you-page-builder-for-woocommerce/
  * Description: Helps you create custom thank you pages for products, categories
- * Version: 1.4.21
+ * Version: 1.4.22
  * Author: WooCommerce & WordPress Tutorials
  * Author URI: https://www.binarycarpenter.com
  * License: GPL2
@@ -195,6 +195,13 @@ class Initiator
 
         //if the customer is going to the thank you page
         if (is_wc_endpoint_url('order-received')) {
+            error_log("logging order received--------->");
+            if ( class_exists( 'WC_Google_Analytics' ) ) {
+                update_post_meta( $_GET['order-received'], '_ga_tracked', 0 );
+            }
+            update_post_meta( $_GET['order-received'], '_tracked', 0 );
+            //fire action for analytics
+
             if (empty($_GET['key']))
                 return;
 
