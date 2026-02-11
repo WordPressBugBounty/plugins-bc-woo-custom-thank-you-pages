@@ -197,9 +197,9 @@ class Initiator
         if (is_wc_endpoint_url('order-received')) {
             error_log("logging order received--------->");
             if ( class_exists( 'WC_Google_Analytics' ) ) {
-                update_post_meta( $_GET['order-received'], '_ga_tracked', 0 );
+                update_post_meta( $_GET['order-received'], '_ga_tracked', 1 );
             }
-            update_post_meta( $_GET['order-received'], '_tracked', 0 );
+            update_post_meta( $_GET['order-received'], '_tracked', 1 );
             //fire action for analytics
 
             if (empty($_GET['key']))
@@ -294,7 +294,6 @@ class Initiator
                 }
                 $thank_you_page_url = add_query_arg(['key' => $order_key, 'bctk' => 1], get_permalink($thank_you_page_id));
 
-                error_log("apply filters thank you page is: " . $thank_you_page_url);
                 wp_redirect($thank_you_page_url, 301);
                 exit;
             }
